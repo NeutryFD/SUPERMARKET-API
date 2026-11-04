@@ -12,9 +12,35 @@ logger = logging.getLogger(__name__) # logger
 
 API = "https://tienda.mercadona.es/api" # URL base de la API de Mercadona
 
-# scrape descarga y devuelve el catálogo completo de Mercadona, ya normalizado
-async def scrape(client: httpx.AsyncClient) -> list[Product]:
-    arbol = await get_json(client, f"{API}/categories/", lang="es")
+
+class PostcodeNotServedError(Exception):
+    """Mercadona no reparte en ese código postal"""
+
+
+# resolve_warehouse traduce un código postal al almacén de Mercadona que lo sirve.
+# La API responde con el almacén en la cabecera x-customer-wh (ej. 08001 -> bcn1)
+# y con un 404 si no reparte en ese código postal.
+async def resolve_warehouse(client: httpx.AsyncClient, postcode: str) -> str:
+    respuesta = await client.post(
+        f"{API}/postal-codes/actions/change-pc/",
+        json={"new_postal_code": postcode},
+    )
+    if respuesta.status_code == 404:
+        raise PostcodeNotServedError(f"Mercadona does not deliver to postcode {postcode}")
+    respuesta.raise_for_status()
+    almacen = respuesta.headers.get("x-customer-wh")
+    if not almacen:
+        raise PostcodeNotServedError(f"No Mercadona warehouse returned for postcode {postcode}")
+    return almacen
+
+
+# scrape descarga y devuelve el catálogo completo de Mercadona para el almacén
+# que sirve al código postal, ya normalizado
+async def scrape(client: httpx.AsyncClient, postcode: str) -> list[Product]:
+    wh = await resolve_warehouse(client, postcode)
+    logger.info("Mercadona: postcode %s -> warehouse %s", postcode, wh)
+
+    arbol = await get_json(client, f"{API}/categories/", lang="es", wh=wh)
     ids = [sub["id"] for categoria in arbol["results"] for sub in categoria["categories"]]
 
     productos: dict[str, Product] = {}
@@ -24,7 +50,7 @@ async def scrape(client: httpx.AsyncClient) -> list[Product]:
     async def bajar_categoria(categoria_id: int) -> None:
         async with limite:
             try:
-                data = await get_json(client, f"{API}/categories/{categoria_id}/", lang="es")
+                data = await get_json(client, f"{API}/categories/{categoria_id}/", lang="es", wh=wh)
             except httpx.HTTPError:
                 fallidas.append(categoria_id)
                 return
@@ -38,7 +64,7 @@ async def scrape(client: httpx.AsyncClient) -> list[Product]:
     for categoria_id in fallidas:
         await asyncio.sleep(10)
         try:
-            data = await get_json(client, f"{API}/categories/{categoria_id}/", lang="es")
+            data = await get_json(client, f"{API}/categories/{categoria_id}/", lang="es", wh=wh)
         except httpx.HTTPError as error:
             logger.error("Categoría %s perdida: %s", categoria_id, error)
             continue
