@@ -84,15 +84,21 @@ def _parsear_categoria(data: dict) -> list[Product]:
             trozos = [p.get("packaging")]
             if precio.get("unit_size") and precio.get("size_format"):
                 trozos.append(f"{precio['unit_size']:g} {precio['size_format']}")
+            # Mercadona no hace ofertas, pero muestra el precio anterior cuando lo baja
+            actual = _a_float(precio.get("unit_price"))
+            anterior = _a_float(str(precio.get("previous_unit_price") or "").strip() or None)
+            bajada = actual is not None and anterior is not None and anterior > actual
             resultado.append(
                 Product(
                     id=str(p["id"]),
                     supermarket="mercadona",
                     name=p.get("display_name") or "",
                     description=" ".join(t for t in trozos if t) or None,
-                    price=_a_float(precio.get("unit_price")),
+                    price=actual,
                     price_per_unit=_a_float(precio.get("reference_price")),
                     unit=precio.get("reference_format"),
+                    previous_price=anterior if bajada else None,
+                    promotion="Bajada de precio" if bajada else None,
                     image_url=p.get("thumbnail"),
                     category=data.get("name"),
                     url=p.get("share_url"),
