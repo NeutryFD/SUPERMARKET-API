@@ -46,7 +46,9 @@ class ProductRoutesTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["items"][0]["name"], "Aceite de oliva")
-        get_products.assert_called_once_with("mercadona", "aceite", "Aceites", 2, 25)
+        get_products.assert_called_once_with(
+            "mercadona", "aceite", "Aceites", 2, 25, "relevance"
+        )
 
     @patch("app.api.routes.products.catalog_service.get_products")
     def test_products_rejects_unknown_supermarket(self, get_products) -> None:
@@ -54,6 +56,13 @@ class ProductRoutesTestCase(unittest.TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "Supermarket not found: unknown")
+        get_products.assert_not_called()
+
+    @patch("app.api.routes.products.catalog_service.get_products")
+    def test_products_rejects_unknown_sort(self, get_products) -> None:
+        response = self.client.get("/products", params={"sort": "random"})
+
+        self.assertEqual(response.status_code, 422)
         get_products.assert_not_called()
 
     @patch("app.api.routes.products.new_client")
