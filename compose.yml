@@ -14,3 +14,8 @@ services:
 
 volumes:
   api-data:
+
+# Named network so other stacks (mercabarna) can reach the API as http://api:8000
+networks:
+  default:
+    name: supermarket-api
