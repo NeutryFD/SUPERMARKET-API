@@ -35,10 +35,11 @@ def get_products(
     category: str | None,
     page: int,
     page_size: int,
+    sort: str = "relevance",
 ) -> ProductPage:
     """Búsqueda paginada de productos"""
     total, items = product_repository.search_products(
-        supermarket, q, category, page, page_size
+        supermarket, q, category, page, page_size, sort
     )
     return ProductPage(
         total=total,
