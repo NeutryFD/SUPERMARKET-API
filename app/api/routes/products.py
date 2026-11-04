@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Query, Response
 from app.schemas.product import (
     ProductFilter,
     ProductPage,
+    ProductSort,
     SupermarketFilter,
     SupermarketInfo,
 )
@@ -22,6 +23,7 @@ IMAGE_HOSTS = frozenset(
     {
         "cdn-consum.aktiosdigitalservices.com",
         "cdn-fornes.aktiosdigitalservices.com",
+        "images.bonarea.com",
         "prod-mercadona.imgix.net",
         "www.lidl.es",
     }
@@ -100,11 +102,14 @@ def products(
     category: str | None = Query(None, description="Filter by category"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
+    sort: ProductSort = Query(
+        "relevance", description="Order: relevance (to q), price, price_per_unit or name"
+    ),
 ) -> ProductPage:
     if supermarket and supermarket not in SUPERMARKETS:
         raise HTTPException(404, f"Supermarket not found: {supermarket}")
     return catalog_service.get_products(
-        supermarket, q, category, page, page_size
+        supermarket, q, category, page, page_size, sort
     )  # Lista los productos guardados, con filtros y paginación
 
 
@@ -120,4 +125,5 @@ def query_products(filters: ProductFilter) -> ProductPage:
         filters.category,
         filters.page,
         filters.page_size,
+        filters.sort,
     )
