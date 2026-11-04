@@ -103,13 +103,14 @@ def products(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     sort: ProductSort = Query(
-        "relevance", description="Order: relevance (to q), price, price_per_unit or name"
+        "relevance", description="Order: relevance (to q), price, price_per_unit, name or discount"
     ),
+    promotion: bool = Query(False, description="Only products with a promotion or price drop"),
 ) -> ProductPage:
     if supermarket and supermarket not in SUPERMARKETS:
         raise HTTPException(404, f"Supermarket not found: {supermarket}")
     return catalog_service.get_products(
-        supermarket, q, category, page, page_size, sort
+        supermarket, q, category, page, page_size, sort, promotion
     )  # Lista los productos guardados, con filtros y paginación
 
 
@@ -126,4 +127,5 @@ def query_products(filters: ProductFilter) -> ProductPage:
         filters.page,
         filters.page_size,
         filters.sort,
+        filters.promotion,
     )
