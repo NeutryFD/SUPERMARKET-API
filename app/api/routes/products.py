@@ -25,6 +25,7 @@ IMAGE_HOSTS = frozenset(
         "cdn-fornes.aktiosdigitalservices.com",
         "images.bonarea.com",
         "prod-mercadona.imgix.net",
+        "s7g10.scene7.com",
         "www.lidl.es",
     }
 )
