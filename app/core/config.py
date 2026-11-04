@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     class Config:
         env_prefix = "SUPERMARKET_API_"
         env_file = ".env"
+        extra = "ignore"  # el .env también lleva variables de docker compose (API_PORT...)
 
 
 # Instancia de la configuración
