@@ -2,6 +2,7 @@
 Scraper de las tiendas Aktios (Consum y Masymas)
 """
 
+import re
 import httpx
 from app.schemas.product import Product
 from app.scrapers.http import get_json
@@ -27,6 +28,21 @@ async def scrape(client: httpx.AsyncClient, supermarket: str, base_url: str) -> 
         if not data.get("hasMore") or not data.get("products"):
             return list(productos.values())
 
+# _promocion devuelve (precio anterior, etiqueta) de un producto de Aktios.
+# Con precio de oferta, la etiqueta es el % de rebaja; sin él, se usa el texto
+# de la oferta (packs, cheque ahorro...)
+def _promocion(p: dict, precios: dict) -> tuple[float | None, str | None]:
+    normal = (precios.get("PRICE") or {}).get("centAmount")
+    oferta = (precios.get("OFFER_PRICE") or {}).get("centAmount")
+    if normal and oferta and oferta < normal:
+        return normal, f"-{round((normal - oferta) / normal * 100)}%"
+    for o in p.get("offers") or []:
+        texto = re.sub(r"<[^>]+>", " ", o.get("shortDescription") or "")
+        texto = re.sub(r"\s+", " ", texto).strip()
+        if texto:
+            return None, texto[:64]
+    return None, None
+
 # _parsear_producto normaliza un producto de la API de Aktios a nuestro esquema Product
 def _parsear_producto(p: dict, supermarket: str) -> Product | None:
     datos = p.get("productData") or {}
@@ -50,7 +66,8 @@ def _parsear_producto(p: dict, supermarket: str) -> Product | None:
     imagen = media[0]["url"] if media else datos.get("imageURL")
 
     categorias = p.get("categories") or []
-    
+    anterior, promocion = _promocion(p, precios)
+
     return Product(
         id=str(p.get("code") or p["id"]),
         supermarket=supermarket,
@@ -60,6 +77,8 @@ def _parsear_producto(p: dict, supermarket: str) -> Product | None:
         price=valor.get("centAmount"),  # pese al nombre, viene en euros
         price_per_unit=valor.get("centUnitAmount"),
         unit=(p.get("priceData") or {}).get("unitPriceUnitType") or None,
+        previous_price=anterior,
+        promotion=promocion,
         image_url=imagen,
         category=categorias[0].get("name") if categorias else None,
         ean=p.get("ean"),

@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     # Supermercados que se scrapean. Lidl queda fuera por defecto: su
     # robots.txt bloquea las URLs de búsqueda que usa su scraper.
     # Formato JSON en el .env: SUPERMARKET_API_ENABLED_SUPERMARKETS=["mercadona","consum"]
-    enabled_supermarkets: list[str] = ["mercadona", "bonarea", "aldi"]
+    enabled_supermarkets: list[str] = ["mercadona", "bonarea", "aldi", "consum", "masymas"]
 
     # Configuración de la clase interna Config para pydantic-settings
     class Config:
