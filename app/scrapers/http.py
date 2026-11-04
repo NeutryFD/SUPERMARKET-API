@@ -19,9 +19,16 @@ def new_client() -> httpx.AsyncClient:
 
 async def get_json(client: httpx.AsyncClient, url: str, **params):
     """GET que reintenta hasta 3 veces con espera creciente entre intentos"""
+    return await _con_reintentos(url, lambda: client.get(url, params=params or None))
+
+async def post_form_json(client: httpx.AsyncClient, url: str, **data):
+    """POST de formulario que devuelve JSON, con los mismos reintentos que get_json"""
+    return await _con_reintentos(url, lambda: client.post(url, data=data))
+
+async def _con_reintentos(url: str, peticion):
     for intento in range(3):
         try:
-            respuesta = await client.get(url, params=params or None)
+            respuesta = await peticion()
             respuesta.raise_for_status()
             return respuesta.json()
         except httpx.HTTPError as error:
