@@ -25,12 +25,16 @@ async def post_form_json(client: httpx.AsyncClient, url: str, **data):
     """POST de formulario que devuelve JSON, con los mismos reintentos que get_json"""
     return await _con_reintentos(url, lambda: client.post(url, data=data))
 
-async def _con_reintentos(url: str, peticion):
+async def get_text(client: httpx.AsyncClient, url: str) -> str:
+    """GET que devuelve el cuerpo como texto (HTML, XML), con los mismos reintentos que get_json"""
+    return await _con_reintentos(url, lambda: client.get(url), leer=lambda r: r.text)
+
+async def _con_reintentos(url: str, peticion, leer=lambda r: r.json()):
     for intento in range(3):
         try:
             respuesta = await peticion()
             respuesta.raise_for_status()
-            return respuesta.json()
+            return leer(respuesta)
         except httpx.HTTPError as error:
             if intento == 2:  # tercer fallo: se rinde y avisa a quien llamó
                 raise
