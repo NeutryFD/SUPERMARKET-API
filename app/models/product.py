@@ -58,6 +58,17 @@ class ProductRow(Base):
         String(64),
     )
 
+    # Precio antes de la promoción o bajada, si la tienda lo muestra
+    previous_price: Mapped[float | None] = mapped_column(
+        Float,
+    )
+
+    # Etiqueta de la promoción; con índice ya que la página de ofertas filtra por ella
+    promotion: Mapped[str | None] = mapped_column(
+        String(64),
+        index=True,
+    )
+
     image_url: Mapped[str | None] = mapped_column(
         Text,
     )
@@ -92,6 +103,8 @@ class ProductRow(Base):
             price=self.price,
             price_per_unit=self.price_per_unit,
             unit=self.unit,
+            previous_price=self.previous_price,
+            promotion=self.promotion,
             image_url=self.image_url,
             category=self.category,
             ean=self.ean,

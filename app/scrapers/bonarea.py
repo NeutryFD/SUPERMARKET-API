@@ -80,6 +80,21 @@ def _categorias_hoja(nivells: list[dict]) -> list[tuple[str, str]]:
     # El identificador es "13*300*010*...": la segunda parte es la sección
     return [(i, n) for i, n in hojas if i.split("*")[1] in SECTIONS]
 
+# Distintivos de promoción de bonÀrea (en "caracteristiques"), por orden de prioridad
+PROMOTIONS = {
+    "SUPERPREU": "Superprecio",
+    "PREU_IMBATIBLE": "Precio imbatible",
+    "BAIXADA_PREU": "Bajada de precio",
+}
+
+# _promocion devuelve la etiqueta de promoción del artículo, o None
+def _promocion(articulo: dict) -> str | None:
+    descuento = _a_float(articulo.get("discount")) or 0
+    if descuento > 0:
+        return f"-{descuento:g}%"
+    distintivos = {c.get("descripcio") for c in articulo.get("caracteristiques") or []}
+    return next((etiqueta for codigo, etiqueta in PROMOTIONS.items() if codigo in distintivos), None)
+
 # _parsear_articulos normaliza los artículos de una categoría de bonÀrea a nuestro esquema Product
 def _parsear_articulos(articulos: list[dict], categoria: str | None) -> list[Product]:
     resultado = []
@@ -97,6 +112,7 @@ def _parsear_articulos(articulos: list[dict], categoria: str | None) -> list[Pro
                 price=_a_float(a.get("priceToPay")),
                 price_per_unit=precio_unidad,
                 unit=unidad,
+                promotion=_promocion(a),
                 image_url=f"{IMAGES}/{imagenes[0]}?width=400&height=400" if imagenes else None,
                 category=categoria,
                 url=a.get("urlFriendly"),

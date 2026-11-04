@@ -100,6 +100,15 @@ def _orden(sort: str, q: str | None) -> list:
         return [ProductRow.price.is_(None), ProductRow.price, ProductRow.name]
     if sort == "price_per_unit":
         return [ProductRow.price_per_unit.is_(None), ProductRow.price_per_unit, ProductRow.name]
+    if sort == "discount":
+        # Mayor rebaja relativa primero; las promociones sin precio anterior, después
+        rebaja = (ProductRow.previous_price - ProductRow.price) / ProductRow.previous_price
+        return [
+            ProductRow.promotion.is_(None),
+            ProductRow.previous_price.is_(None),
+            rebaja.desc(),
+            ProductRow.name,
+        ]
     terms = _search_terms(q) if q else []
     if sort == "relevance" and terms:
         nombre = _normalized_column(ProductRow.name)
@@ -137,6 +146,7 @@ def search_products(
     page: int,
     page_size: int,
     sort: str = "relevance",
+    promotion: bool = False,
 ) -> tuple[int, list[Product]]:
     """Devuelve (total de resultados, productos de la página pedida)
     Los filtros se aplican en SQL, que con los índices de la tabla es
@@ -160,6 +170,8 @@ def search_products(
             )
     if category:
         filtros.append(ProductRow.category.ilike(f"%{category}%"))
+    if promotion:
+        filtros.append(ProductRow.promotion.is_not(None))
 
     with SessionLocal() as session:
         total = (

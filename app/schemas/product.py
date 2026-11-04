@@ -36,6 +36,14 @@ class Product(BaseModel):
         default=None,
         description="Price per reference unit in EUR (per Kg, per L...)",
     )
+    previous_price: float | None = Field(
+        default=None,
+        description="Price before the current promotion or price drop, if the store shows it",
+    )
+    promotion: str | None = Field(
+        default=None,
+        description="Promotion label shown by the store ('Bajada de precio', '-20%'...)",
+    )
     unit: str | None = Field(
         default=None,
         description="Reference unit of the previous price ('1 Kg', 'L'...)",
@@ -58,7 +66,7 @@ class Product(BaseModel):
     )
 
 
-ProductSort = Literal["relevance", "price", "price_per_unit", "name"]
+ProductSort = Literal["relevance", "price", "price_per_unit", "name", "discount"]
 
 
 class ProductFilter(BaseModel):
@@ -92,7 +100,11 @@ class ProductFilter(BaseModel):
     )
     sort: ProductSort = Field(
         default="relevance",
-        description="Order: relevance (to q), price, price_per_unit or name",
+        description="Order: relevance (to q), price, price_per_unit, name or discount",
+    )
+    promotion: bool = Field(
+        default=False,
+        description="Only products with a promotion or price drop",
     )
 
 
