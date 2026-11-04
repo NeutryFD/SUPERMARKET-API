@@ -160,6 +160,10 @@ class ScrapeJob(BaseModel):
         default=0,
         description="Products obtained in the last completed scraping",
     )
+    postcode: str | None = Field(
+        default=None,
+        description="Postcode used for the scraping (only Mercadona prices depend on it)",
+    )
     started_at: datetime | None = Field(
         default=None,
         description="When the job started",

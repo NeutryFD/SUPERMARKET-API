@@ -4,13 +4,22 @@ Router de scraping
 
 import secrets
 from typing import Annotated
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from app.core.config import settings
 from app.schemas.product import ScrapeJob, ScrapeStatusFilter
 from app.scrapers import SUPERMARKETS
 from app.services import scrape_service
 
 router = APIRouter(prefix="/scrape", tags=["scraping"])  # Declaración del router
+
+# Código postal español: 5 dígitos y provincia 01-52
+PostcodeQuery = Annotated[
+    str | None,
+    Query(
+        pattern=r"^(0[1-9]|[1-4]\d|5[0-2])\d{3}$",
+        description="Spanish postcode used to pick the Mercadona warehouse (default from settings)",
+    ),
+]
 
 
 def require_scrape_token(
@@ -37,8 +46,8 @@ def require_scrape_token(
     status_code=202,
     dependencies=[Depends(require_scrape_token)],
 )
-async def scrape_all() -> list[ScrapeJob]:
-    return scrape_service.start_all()  # Lanza el scraping de todos los supermercados y devuelve la lista de trabajos iniciados
+async def scrape_all(postcode: PostcodeQuery = None) -> list[ScrapeJob]:
+    return scrape_service.start_all(postcode)  # Lanza el scraping de todos los supermercados y devuelve la lista de trabajos iniciados
 
 
 # GET de status de los trabajos de scraping
@@ -64,7 +73,7 @@ def query_scrape_status(filters: ScrapeStatusFilter | None = None) -> list[Scrap
     status_code=202,
     dependencies=[Depends(require_scrape_token)],
 )
-async def scrape_one(supermarket: str) -> ScrapeJob:
+async def scrape_one(supermarket: str, postcode: PostcodeQuery = None) -> ScrapeJob:
     if supermarket not in SUPERMARKETS:
         raise HTTPException(404, f"Supermarket not found: {supermarket}")
-    return scrape_service.start_job(supermarket)
+    return scrape_service.start_job(supermarket, postcode)

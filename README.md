@@ -183,6 +183,18 @@ SUPERMARKET_API_DATABASE_URL=mysql+pymysql://usuario:password@host:3306/supermar
 
 La base de datos debe existir (`CREATE DATABASE supermarket_api CHARACTER SET utf8mb4;`); las tablas se crean solas al arrancar la API. Si tienes catálogos JSON de versiones anteriores, impórtalos con `python -m scripts.import_json`.
 
+### 📍 Código postal y supermercados activos
+
+Los precios de Mercadona dependen del almacén que sirve cada código postal. El scraper traduce el código postal a su almacén (cabecera `x-customer-wh` de la API de Mercadona) y descarga el catálogo de ese almacén. Se indica con `POST /scrape?postcode=08001`; sin él se usa `SUPERMARKET_API_POSTCODE` (por defecto `08001`).
+
+Solo se scrapean los supermercados de `SUPERMARKET_API_ENABLED_SUPERMARKETS` (por defecto `["mercadona"]`). Lidl queda desactivado por defecto porque su robots.txt bloquea las URLs de búsqueda que usa su scraper.
+
+### 🐳 Docker
+
+El `Dockerfile` arranca la API en el puerto 8000 y guarda la base de datos SQLite en el volumen `/data`.
+
+Tests: `python -m pytest tests`.
+
 ### Actualización diaria con Coolify
 
 Los endpoints que inician un scraping requieren el header `X-Scrape-Token`. Define

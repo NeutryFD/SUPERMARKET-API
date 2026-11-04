@@ -32,6 +32,15 @@ class Settings(BaseSettings):
     )
     user_agent: str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"  # User Agent es importante para que los scrapers no sean bloqueados por los supermercados
 
+    # Código postal por defecto: decide el almacén de Mercadona (y sus precios)
+    # cuando el scraping se lanza sin ?postcode=
+    postcode: str = "08001"
+
+    # Supermercados que se scrapean. Lidl queda fuera por defecto: su
+    # robots.txt bloquea las URLs de búsqueda que usa su scraper.
+    # Formato JSON en el .env: SUPERMARKET_API_ENABLED_SUPERMARKETS=["mercadona","consum"]
+    enabled_supermarkets: list[str] = ["mercadona"]
+
     # Configuración de la clase interna Config para pydantic-settings
     class Config:
         env_prefix = "SUPERMARKET_API_"
