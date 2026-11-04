@@ -5,7 +5,7 @@ Capa de repositorio
 from datetime import datetime, timezone
 import re
 import unicodedata
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import and_, case, delete, func, or_, select
 from app.core.database import SessionLocal
 from app.models.product import ProductRow
 from app.repositories import backup_repository
@@ -94,6 +94,41 @@ def get_categories(supermarket: str | None = None) -> list[str]:
         return list(session.scalars(query).all())
 
 
+# _orden devuelve el ORDER BY de la búsqueda según el criterio pedido
+def _orden(sort: str, q: str | None) -> list:
+    if sort == "price":
+        return [ProductRow.price.is_(None), ProductRow.price, ProductRow.name]
+    if sort == "price_per_unit":
+        return [ProductRow.price_per_unit.is_(None), ProductRow.price_per_unit, ProductRow.name]
+    terms = _search_terms(q) if q else []
+    if sort == "relevance" and terms:
+        nombre = _normalized_column(ProductRow.name)
+        frase = " ".join(terms)
+        # Primero el nombre que empieza por la frase buscada, luego el que la
+        # contiene como palabra, luego el que la contiene en cualquier sitio
+        frase_en_nombre = case(
+            (nombre.like(f"{frase}%"), 0),
+            (nombre.like(f"% {frase}%"), 1),
+            (nombre.like(f"%{frase}%"), 2),
+            else_=3,
+        )
+        # Después, los que tienen todas las palabras en el nombre (y no solo en la categoría)
+        palabras_en_nombre = case(
+            (and_(*(nombre.like(f"%{term}%") for term in terms)), 0), else_=1
+        )
+        empieza_por_primera = case((nombre.like(f"{terms[0]}%"), 0), else_=1)
+        return [
+            frase_en_nombre,
+            palabras_en_nombre,
+            empieza_por_primera,
+            func.length(ProductRow.name),  # a igualdad, los nombres más cortos son más exactos
+            ProductRow.name,
+        ]
+    if sort == "name":
+        return [ProductRow.name]
+    return [ProductRow.supermarket, ProductRow.name]
+
+
 # Buscar productos con filtros y paginación
 def search_products(
     supermarket: str | None,
@@ -101,6 +136,7 @@ def search_products(
     category: str | None,
     page: int,
     page_size: int,
+    sort: str = "relevance",
 ) -> tuple[int, list[Product]]:
     """Devuelve (total de resultados, productos de la página pedida)
     Los filtros se aplican en SQL, que con los índices de la tabla es
@@ -133,7 +169,7 @@ def search_products(
         rows = session.scalars(
             select(ProductRow)
             .where(*filtros)
-            .order_by(ProductRow.supermarket, ProductRow.name)
+            .order_by(*_orden(sort, q))
             .offset((page - 1) * page_size)  # salta las páginas anteriores
             .limit(page_size)
         ).all()
