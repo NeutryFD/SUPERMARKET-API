@@ -36,10 +36,11 @@ def get_products(
     page: int,
     page_size: int,
     sort: str = "relevance",
+    promotion: bool = False,
 ) -> ProductPage:
     """Búsqueda paginada de productos"""
     total, items = product_repository.search_products(
-        supermarket, q, category, page, page_size, sort
+        supermarket, q, category, page, page_size, sort, promotion
     )
     return ProductPage(
         total=total,
