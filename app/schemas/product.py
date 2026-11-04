@@ -58,6 +58,9 @@ class Product(BaseModel):
     )
 
 
+ProductSort = Literal["relevance", "price", "price_per_unit", "name"]
+
+
 class ProductFilter(BaseModel):
     """Criterios de búsqueda para el método QUERY
 
@@ -86,6 +89,10 @@ class ProductFilter(BaseModel):
         ge=1,
         le=500,
         description="Results per page (maximum 500)",
+    )
+    sort: ProductSort = Field(
+        default="relevance",
+        description="Order: relevance (to q), price, price_per_unit or name",
     )
 
 
