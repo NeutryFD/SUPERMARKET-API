@@ -144,8 +144,9 @@ flowchart LR
 
 | Método | Ruta | Descripción |
 | ------ | ---- | ----------- |
-| `GET` | `/products` | Productos con filtros (`supermarket`, `q`, `category`, `promotion`), orden (`sort`: `relevance`, `price`, `price_per_unit`, `name`, `discount`) y paginación |
+| `GET` | `/products` | Productos con filtros (`supermarket`, `q`, `category`, `promotion`, `section`, `subcategory`), orden (`sort`: `relevance`, `price`, `price_per_unit`, `name`, `discount`) y paginación |
 | `QUERY` | `/products` | Igual, pero con los filtros en el body como JSON (RFC 10008) |
+| `GET` | `/sections` | Secciones comunes a todos los supermercados con su nº de productos para los filtros dados; con `section`, también las categorías de tienda de esa sección |
 | `GET` / `QUERY` | `/supermarkets` | Supermercados con nº de productos y fecha del último scraping |
 | `POST` | `/scrape` | Lanza el scraping de todos los supermercados activos en segundo plano (`postcode` opcional) |
 | `POST` | `/scrape/{supermarket}` | Lanza el scraping de uno: `mercadona`, `bonarea`, `aldi`, `consum`, `masymas` o `lidl` (`postcode` opcional) |
@@ -200,6 +201,10 @@ La base de datos debe existir (`CREATE DATABASE supermarket_api CHARACTER SET ut
 Los precios de Mercadona dependen del almacén que sirve cada código postal. El scraper traduce el código postal a su almacén (cabecera `x-customer-wh` de la API de Mercadona) y descarga el catálogo de ese almacén. Se indica con `POST /scrape?postcode=08001`; sin él se usa `SUPERMARKET_API_POSTCODE` (por defecto `08001`).
 
 Solo se scrapean los supermercados de `SUPERMARKET_API_ENABLED_SUPERMARKETS` (por defecto `["mercadona","bonarea","aldi","consum","masymas"]`). Lidl queda desactivado por defecto porque su robots.txt bloquea las URLs de búsqueda que usa su scraper. Los precios de bonÀrea, Aldi, Consum y Masymas no dependen del código postal.
+
+### 🗂️ Secciones comunes
+
+Cada tienda tiene sus propias categorías. Para navegar por todas a la vez, cada producto se clasifica en una de 16 secciones comunes (Fruta y verdura, Lácteos y huevos, Bebidas, Limpieza y hogar…) a partir de la ruta de su categoría en la tienda y, si no basta, de su nombre (`app/sections.py`). Va en el campo `section`; al arrancar, la API clasifica los productos guardados que no la tienen.
 
 ### 🏷️ Ofertas
 
