@@ -121,6 +121,21 @@ class SectionsApiTestCase(unittest.TestCase):
         self.assertEqual([p["id"] for p in response.json()["items"]], ["2"])
         self.assertEqual(response.json()["items"][0]["section"], "lacteos-huevos")
 
+    def test_products_and_sections_can_be_limited_to_some_supermarkets(self) -> None:
+        response = self.client.get("/products", params={"supermarkets": "mercadona,aldi"})
+        self.assertEqual(sorted(p["supermarket"] for p in response.json()["items"]), ["aldi", "aldi", "mercadona"])
+
+        counts = {s["slug"]: s["count"] for s in self._counts(supermarkets="bonarea")}
+        self.assertEqual((counts["lacteos-huevos"], counts["despensa"]), (2, 0))
+
+    def test_an_empty_supermarket_list_matches_nothing(self) -> None:
+        self.assertEqual(self.client.get("/products", params={"supermarkets": ""}).json()["total"], 0)
+        self.assertTrue(all(s["count"] == 0 for s in self._counts(supermarkets="")))
+
+    def test_unknown_supermarket_in_the_list_is_rejected(self) -> None:
+        self.assertEqual(self.client.get("/products", params={"supermarkets": "mercadona,nope"}).status_code, 404)
+        self.assertEqual(self.client.get("/sections", params={"supermarkets": "nope"}).status_code, 404)
+
     def test_unknown_section_is_rejected(self) -> None:
         self.assertEqual(self.client.get("/sections", params={"section": "nope"}).status_code, 404)
         self.assertEqual(self.client.get("/products", params={"section": "nope"}).status_code, 404)
