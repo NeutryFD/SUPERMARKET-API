@@ -22,6 +22,9 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()  # crea las tablas si no existen
+    con_busqueda = product_repository.backfill_search_columns()
+    if con_busqueda:
+        logging.getLogger(__name__).info("Search columns filled for %d stored products", con_busqueda)
     clasificados = product_repository.backfill_sections()
     if clasificados:
         logging.getLogger(__name__).info("Sections assigned to %d stored products", clasificados)
