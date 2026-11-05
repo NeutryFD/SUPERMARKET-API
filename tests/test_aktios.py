@@ -42,5 +42,28 @@ class AktiosPromotionTestCase(unittest.TestCase):
         self.assertEqual((p.previous_price, p.promotion), (None, None))
 
 
+class AktiosSectionTestCase(unittest.TestCase):
+    def test_uses_the_menu_path_and_skips_offer_categories(self) -> None:
+        product = _product({"PRICE": 2.35})
+        product["categories"] = [
+            {"id": 900, "name": "Ofertas en despensa"},
+            {"id": 1933, "name": "Té"},
+        ]
+        rutas = {
+            900: ["Ahora más barato", "Ofertas en despensa"],
+            1933: ["Despensa", "Desayuno, dulces y café", "Infusiones", "Té"],
+        }
+
+        p = aktios._parsear_producto(product, "consum", rutas)
+
+        self.assertEqual((p.category, p.section), ("Té", "desayuno-dulces"))
+
+    def test_without_menu_falls_back_to_the_first_category(self) -> None:
+        product = _product({"PRICE": 1.0})
+        product["categories"] = [{"id": 1, "name": "Yogures"}]
+        p = aktios._parsear_producto(product, "masymas")
+        self.assertEqual((p.category, p.section), ("Yogures", "lacteos-huevos"))
+
+
 if __name__ == "__main__":
     unittest.main()

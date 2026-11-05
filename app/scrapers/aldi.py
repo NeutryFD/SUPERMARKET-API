@@ -8,6 +8,7 @@ import logging
 import re
 import httpx
 from app.schemas.product import Product
+from app.sections import classify
 from app.scrapers.http import get_text
 
 logger = logging.getLogger(__name__) # logger
@@ -91,7 +92,9 @@ def _parsear_hit(hit: dict) -> Product | None:
 
     base = (precio.get("basePrice") or [{}])[0]
     imagen = next((a.get("url") for a in hit.get("assets") or [] if a.get("type") == "primary"), None)
-    categorias = (hit.get("hierarchicalCategories") or {}).get("lvl1") or []
+    jerarquia = hit.get("hierarchicalCategories") or {}
+    categorias = jerarquia.get("lvl1") or []
+    ruta = categorias[0].split(" > ") if categorias else (jerarquia.get("lvl0") or [hit.get("mainCategoryID")])[:1]
 
     return Product(
         id=str(hit["objectID"]),
@@ -106,6 +109,7 @@ def _parsear_hit(hit: dict) -> Product | None:
         promotion=etiqueta or ("Oferta" if anterior else None),
         image_url=f"{imagen}?wid=400&hei=400" if imagen else None,
         category=categorias[0].split(" > ")[-1] if categorias else hit.get("mainCategoryID"),
+        section=classify(ruta, hit["name"]),
         url=f"{BASE}/producto/{hit['productSlug']}.html" if hit.get("productSlug") else None,
     )
 

@@ -10,6 +10,7 @@ from app.core.database import SessionLocal
 from app.models.product import ProductRow
 from app.repositories import backup_repository
 from app.schemas.product import Product
+from app.sections import classify
 
 
 def _search_terms(query: str) -> list[str]:
@@ -44,6 +45,10 @@ def save_catalog(supermarket: str, products: list[Product]) -> None:
     """Borra el catálogo anterior del supermercado y guarda el nuevo,
     todo en una transacción (si algo falla a medias, no se pierde nada)"""
     now = datetime.now(timezone.utc)
+
+    for product in products:
+        if product.section is None:
+            product.section = classify([product.category], product.name)
 
     rows = [
         ProductRow(
@@ -138,19 +143,15 @@ def _orden(sort: str, q: str | None) -> list:
     return [ProductRow.supermarket, ProductRow.name]
 
 
-# Buscar productos con filtros y paginación
-def search_products(
+# _filtros compone el WHERE común a la búsqueda y al recuento por secciones
+def _filtros(
     supermarket: str | None,
     q: str | None,
     category: str | None,
-    page: int,
-    page_size: int,
-    sort: str = "relevance",
     promotion: bool = False,
-) -> tuple[int, list[Product]]:
-    """Devuelve (total de resultados, productos de la página pedida)
-    Los filtros se aplican en SQL, que con los índices de la tabla es
-    mucho más rápido que traer todo y filtrar en Python"""
+    section: str | None = None,
+    subcategory: str | None = None,
+) -> list:
     filtros = []
     if supermarket:
         filtros.append(ProductRow.supermarket == supermarket)
@@ -172,6 +173,29 @@ def search_products(
         filtros.append(ProductRow.category.ilike(f"%{category}%"))
     if promotion:
         filtros.append(ProductRow.promotion.is_not(None))
+    if section:
+        filtros.append(ProductRow.section == section)
+    if subcategory:
+        filtros.append(ProductRow.category == subcategory)
+    return filtros
+
+
+# Buscar productos con filtros y paginación
+def search_products(
+    supermarket: str | None,
+    q: str | None,
+    category: str | None,
+    page: int,
+    page_size: int,
+    sort: str = "relevance",
+    promotion: bool = False,
+    section: str | None = None,
+    subcategory: str | None = None,
+) -> tuple[int, list[Product]]:
+    """Devuelve (total de resultados, productos de la página pedida)
+    Los filtros se aplican en SQL, que con los índices de la tabla es
+    mucho más rápido que traer todo y filtrar en Python"""
+    filtros = _filtros(supermarket, q, category, promotion, section, subcategory)
 
     with SessionLocal() as session:
         total = (
@@ -186,3 +210,44 @@ def search_products(
             .limit(page_size)
         ).all()
     return total, [row.to_schema() for row in rows]
+
+
+# Contar productos por sección (y por categoría de tienda dentro de una sección)
+def count_sections(
+    supermarket: str | None,
+    q: str | None,
+    promotion: bool = False,
+    section: str | None = None,
+) -> tuple[dict[str, int], dict[str, int]]:
+    """Devuelve ({sección: productos}, {categoría de tienda: productos}).
+    Las categorías solo se cuentan para la sección pedida."""
+    filtros = _filtros(supermarket, q, None, promotion)
+    with SessionLocal() as session:
+        por_seccion = dict(
+            session.execute(
+                select(ProductRow.section, func.count())
+                .where(*filtros)
+                .group_by(ProductRow.section)
+            ).all()
+        )
+        por_categoria = {}
+        if section:
+            por_categoria = dict(
+                session.execute(
+                    select(ProductRow.category, func.count())
+                    .where(*filtros, ProductRow.section == section, ProductRow.category.is_not(None))
+                    .group_by(ProductRow.category)
+                ).all()
+            )
+    return por_seccion, por_categoria
+
+
+# Clasificar en secciones los productos que no la tienen
+def backfill_sections() -> int:
+    """Asigna sección a las filas sin ella (catálogos de versiones anteriores o
+    scrapers que no la calculan) con su categoría y su nombre. Devuelve cuántas."""
+    with SessionLocal() as session, session.begin():
+        rows = session.scalars(select(ProductRow).where(ProductRow.section.is_(None))).all()
+        for row in rows:
+            row.section = classify([row.category], row.name)
+    return len(rows)

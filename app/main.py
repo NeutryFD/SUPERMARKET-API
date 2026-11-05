@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.database import init_db
+from app.repositories import product_repository
 
 # Configuración del logger
 logging.basicConfig(
@@ -21,6 +22,9 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()  # crea las tablas si no existen
+    clasificados = product_repository.backfill_sections()
+    if clasificados:
+        logging.getLogger(__name__).info("Sections assigned to %d stored products", clasificados)
     yield  # aquí la app queda sirviendo peticiones
 
 

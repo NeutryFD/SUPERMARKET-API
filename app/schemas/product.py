@@ -56,6 +56,10 @@ class Product(BaseModel):
         default=None,
         description="Category within the supermarket",
     )
+    section: str | None = Field(
+        default=None,
+        description="Common section shared by all supermarkets (see GET /sections)",
+    )
     ean: str | None = Field(
         default=None,
         description="EAN barcode, if the API returns it",
@@ -105,6 +109,14 @@ class ProductFilter(BaseModel):
     promotion: bool = Field(
         default=False,
         description="Only products with a promotion or price drop",
+    )
+    section: str | None = Field(
+        default=None,
+        description="Filter by common section slug",
+    )
+    subcategory: str | None = Field(
+        default=None,
+        description="Filter by exact store category name",
     )
 
 
@@ -194,4 +206,23 @@ class ScrapeJob(BaseModel):
     error: str | None = Field(
         default=None,
         description="Error message if the job failed",
+    )
+
+
+class SectionCategory(BaseModel):
+    """Categoría de una tienda dentro de una sección, con su número de productos"""
+
+    name: str = Field(description="Store category name")
+    count: int = Field(description="Products matching the filters")
+
+
+class SectionInfo(BaseModel):
+    """Sección común con su número de productos para los filtros dados"""
+
+    slug: str = Field(description="Section slug, used in ?section=")
+    name: str = Field(description="Section name")
+    count: int = Field(description="Products matching the filters")
+    categories: list[SectionCategory] = Field(
+        default_factory=list,
+        description="Store categories of the section, only for the requested section",
     )

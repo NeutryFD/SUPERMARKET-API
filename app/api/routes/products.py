@@ -10,11 +10,13 @@ from app.schemas.product import (
     ProductFilter,
     ProductPage,
     ProductSort,
+    SectionInfo,
     SupermarketFilter,
     SupermarketInfo,
 )
 from app.scrapers import SUPERMARKETS
 from app.scrapers.http import new_client
+from app.sections import SECTION_NAMES
 from app.services import catalog_service
 
 router = APIRouter(tags=["products"])  # Declaración del router
@@ -107,11 +109,15 @@ def products(
         "relevance", description="Order: relevance (to q), price, price_per_unit, name or discount"
     ),
     promotion: bool = Query(False, description="Only products with a promotion or price drop"),
+    section: str | None = Query(None, description="Common section slug (see GET /sections)"),
+    subcategory: str | None = Query(None, description="Exact store category name"),
 ) -> ProductPage:
     if supermarket and supermarket not in SUPERMARKETS:
         raise HTTPException(404, f"Supermarket not found: {supermarket}")
+    if section and section not in SECTION_NAMES:
+        raise HTTPException(404, f"Section not found: {section}")
     return catalog_service.get_products(
-        supermarket, q, category, page, page_size, sort, promotion
+        supermarket, q, category, page, page_size, sort, promotion, section, subcategory
     )  # Lista los productos guardados, con filtros y paginación
 
 
@@ -129,4 +135,21 @@ def query_products(filters: ProductFilter) -> ProductPage:
         filters.page_size,
         filters.sort,
         filters.promotion,
+        filters.section,
+        filters.subcategory,
     )
+
+
+# GET de secciones comunes con el número de productos para los filtros dados
+@router.get("/sections", response_model=list[SectionInfo])
+def sections(
+    supermarket: str | None = Query(None, description="Filter by supermarket"),
+    q: str | None = Query(None, description="Search words, as in GET /products"),
+    promotion: bool = Query(False, description="Only products with a promotion or price drop"),
+    section: str | None = Query(None, description="Section whose store categories are returned"),
+) -> list[SectionInfo]:
+    if supermarket and supermarket not in SUPERMARKETS:
+        raise HTTPException(404, f"Supermarket not found: {supermarket}")
+    if section and section not in SECTION_NAMES:
+        raise HTTPException(404, f"Section not found: {section}")
+    return catalog_service.get_sections(supermarket, q, promotion, section)
