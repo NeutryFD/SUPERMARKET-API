@@ -24,7 +24,7 @@ Supermarket API es una API REST autoalojada que extrae el **catálogo completo**
 
 ## ✨ Qué puedes hacer
 
-- 🛒 Descargar el catálogo **completo** de Mercadona, bonÀrea, Aldi, Consum, Masymas y Lidl (~35.000 productos) con una sola petición.
+- 🛒 Descargar el catálogo **completo** de Mercadona, bonÀrea, Aldi, Consum, Masymas y Lidl (~31.000 productos) con una sola petición.
 - 🏷️ Ver las ofertas y bajadas de precio de cada cadena, con el precio anterior cuando la tienda lo muestra, ordenadas por descuento.
 - 📍 Obtener los precios de Mercadona del almacén que sirve a un código postal.
 - 🔍 Buscar productos por nombre, descripción o marca, ordenados por relevancia, precio, precio por unidad, nombre o descuento, con filtros por supermercado, categoría y ofertas, paginados.
@@ -124,7 +124,7 @@ flowchart LR
 | Componente | Tecnología | Detalle |
 | ---------- | ---------- | ------- |
 | API | FastAPI + Uvicorn | Capa HTTP con GET, POST y **QUERY (RFC 10008)**. Swagger en `/docs`. Puerto **8000**. |
-| Scrapers | httpx asíncrono | Mercadona (API de categorías), bonÀrea (JSON de su tienda online), Aldi (datos de Next.js de sus páginas de categoría), Aktios (API compartida por Consum y Masymas) y Lidl (API de búsqueda de su web). |
+| Scrapers | httpx asíncrono | Mercadona (API de categorías), bonÀrea (JSON de su tienda online), Aldi (datos de Next.js de sus páginas de categoría), Aktios (API compartida por Consum y Masymas) y Lidl (ofertas en tienda de su web). |
 | BBDD | MySQL / SQLite vía SQLAlchemy | `products` (catálogo) y `product_backups` (scripts .sql de respaldo). |
 
 ### 🏪 Fuentes de datos
@@ -136,7 +136,7 @@ flowchart LR
 | Aldi | Páginas de categoría de `www.aldi.es` listadas en su sitemap (estado de Algolia en los datos de Next.js; precios de península) | ~2.500 |
 | Consum | API REST Aktios `tienda.consum.es/api/rest/V1.0` (paginada por offset) | ~9.300 |
 | Masymas | API REST Aktios `tienda.masymas.com/api/rest/V1.0` (misma plataforma) | ~7.800 |
-| Lidl | API de búsqueda `www.lidl.es/q/api/search` (doble pasada por offset) | ~4.800 |
+| Lidl | Páginas de ofertas en tienda de esta semana de `www.lidl.es/c/store/...` (datos de cada producto en el HTML; precios de península). Lidl no vende alimentación online en España: solo están sus ofertas de la semana, no el catálogo completo | ~100 |
 
 ---
 
@@ -200,7 +200,7 @@ La base de datos debe existir (`CREATE DATABASE supermarket_api CHARACTER SET ut
 
 Los precios de Mercadona dependen del almacén que sirve cada código postal. El scraper traduce el código postal a su almacén (cabecera `x-customer-wh` de la API de Mercadona) y descarga el catálogo de ese almacén. Se indica con `POST /scrape?postcode=08001`; sin él se usa `SUPERMARKET_API_POSTCODE` (por defecto `08001`).
 
-Solo se scrapean los supermercados de `SUPERMARKET_API_ENABLED_SUPERMARKETS` (por defecto `["mercadona","bonarea","aldi","consum","masymas"]`). Lidl queda desactivado por defecto porque su robots.txt bloquea las URLs de búsqueda que usa su scraper. Los precios de bonÀrea, Aldi, Consum y Masymas no dependen del código postal.
+Solo se scrapean los supermercados de `SUPERMARKET_API_ENABLED_SUPERMARKETS` (por defecto `["mercadona","bonarea","aldi","consum","masymas","lidl"]`). Los precios de bonÀrea, Aldi, Consum, Masymas y Lidl no dependen del código postal. Las ofertas de Lidl llevan en `promotion` hasta cuándo valen y si el precio es solo con Lidl Plus (por ejemplo `Con Lidl Plus -27% · hasta el 8/11`).
 
 ### 🗂️ Secciones comunes
 
@@ -281,7 +281,7 @@ SUPERMARKET-API/
     │   ├── bonarea.py       # JSON de la tienda online de bonÀrea
     │   ├── aldi.py          # Páginas de categoría de www.aldi.es
     │   ├── aktios.py        # API compartida por Consum y Masymas
-    │   └── lidl.py          # API de búsqueda de www.lidl.es
+    │   └── lidl.py          # Ofertas en tienda de www.lidl.es
     │
     ├── models/              # Tablas de la base de datos (SQLAlchemy ORM)
     │   ├── product.py       # Tabla products
