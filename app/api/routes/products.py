@@ -21,6 +21,21 @@ from app.services import catalog_service
 
 router = APIRouter(tags=["products"])  # Declaración del router
 
+SupermarketsQuery = Query(
+    None, description="Comma-separated supermarkets to include (empty = none), e.g. mercadona,aldi"
+)
+
+
+def _parse_supermarkets(value: str | None) -> list[str] | None:
+    """Convierte "mercadona,aldi" en una lista; None si no se pide filtro"""
+    if value is None:
+        return None
+    nombres = [s.strip() for s in value.split(",") if s.strip()]
+    desconocidos = [s for s in nombres if s not in SUPERMARKETS]
+    if desconocidos:
+        raise HTTPException(404, f"Supermarket not found: {', '.join(desconocidos)}")
+    return nombres
+
 IMAGE_HOSTS = frozenset(
     {
         "cdn-consum.aktiosdigitalservices.com",
@@ -111,13 +126,15 @@ def products(
     promotion: bool = Query(False, description="Only products with a promotion or price drop"),
     section: str | None = Query(None, description="Common section slug (see GET /sections)"),
     subcategory: str | None = Query(None, description="Exact store category name"),
+    supermarkets: str | None = SupermarketsQuery,
 ) -> ProductPage:
     if supermarket and supermarket not in SUPERMARKETS:
         raise HTTPException(404, f"Supermarket not found: {supermarket}")
     if section and section not in SECTION_NAMES:
         raise HTTPException(404, f"Section not found: {section}")
     return catalog_service.get_products(
-        supermarket, q, category, page, page_size, sort, promotion, section, subcategory
+        supermarket, q, category, page, page_size, sort, promotion, section, subcategory,
+        _parse_supermarkets(supermarkets),
     )  # Lista los productos guardados, con filtros y paginación
 
 
@@ -137,6 +154,7 @@ def query_products(filters: ProductFilter) -> ProductPage:
         filters.promotion,
         filters.section,
         filters.subcategory,
+        _parse_supermarkets(",".join(filters.supermarkets)) if filters.supermarkets is not None else None,
     )
 
 
@@ -147,9 +165,10 @@ def sections(
     q: str | None = Query(None, description="Search words, as in GET /products"),
     promotion: bool = Query(False, description="Only products with a promotion or price drop"),
     section: str | None = Query(None, description="Section whose store categories are returned"),
+    supermarkets: str | None = SupermarketsQuery,
 ) -> list[SectionInfo]:
     if supermarket and supermarket not in SUPERMARKETS:
         raise HTTPException(404, f"Supermarket not found: {supermarket}")
     if section and section not in SECTION_NAMES:
         raise HTTPException(404, f"Section not found: {section}")
-    return catalog_service.get_sections(supermarket, q, promotion, section)
+    return catalog_service.get_sections(supermarket, q, promotion, section, _parse_supermarkets(supermarkets))

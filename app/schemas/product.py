@@ -118,6 +118,10 @@ class ProductFilter(BaseModel):
         default=None,
         description="Filter by exact store category name",
     )
+    supermarkets: list[str] | None = Field(
+        default=None,
+        description="Only these supermarkets (empty list = none)",
+    )
 
 
 class SupermarketFilter(BaseModel):
