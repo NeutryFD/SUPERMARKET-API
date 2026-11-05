@@ -6,6 +6,7 @@ import asyncio
 import logging
 import httpx
 from app.schemas.product import Product
+from app.sections import classify
 from app.scrapers.http import get_json
 
 logger = logging.getLogger(__name__) # logger
@@ -42,6 +43,8 @@ async def scrape(client: httpx.AsyncClient, postcode: str) -> list[Product]:
 
     arbol = await get_json(client, f"{API}/categories/", lang="es", wh=wh)
     ids = [sub["id"] for categoria in arbol["results"] for sub in categoria["categories"]]
+    # Categoría principal de cada subcategoría, para clasificar en secciones
+    padres = {sub["id"]: categoria.get("name") for categoria in arbol["results"] for sub in categoria["categories"]}
 
     productos: dict[str, Product] = {}
     fallidas: list[int] = []
@@ -54,7 +57,7 @@ async def scrape(client: httpx.AsyncClient, postcode: str) -> list[Product]:
             except httpx.HTTPError:
                 fallidas.append(categoria_id)
                 return
-        for producto in _parsear_categoria(data):
+        for producto in _parsear_categoria(data, padres.get(categoria_id)):
             productos.setdefault(producto.id, producto)
 
     await asyncio.gather(*(bajar_categoria(i) for i in ids))
@@ -68,13 +71,13 @@ async def scrape(client: httpx.AsyncClient, postcode: str) -> list[Product]:
         except httpx.HTTPError as error:
             logger.error("Categoría %s perdida: %s", categoria_id, error)
             continue
-        for producto in _parsear_categoria(data):
+        for producto in _parsear_categoria(data, padres.get(categoria_id)):
             productos.setdefault(producto.id, producto)
 
     return list(productos.values())
 
 # _parsear_categoria normaliza los productos de una categoría de la API de Mercadona a nuestro esquema Product
-def _parsear_categoria(data: dict) -> list[Product]:
+def _parsear_categoria(data: dict, padre: str | None = None) -> list[Product]:
     resultado = []
     for seccion in data.get("categories", []):
         for p in seccion.get("products", []):
@@ -101,6 +104,7 @@ def _parsear_categoria(data: dict) -> list[Product]:
                     promotion="Bajada de precio" if bajada else None,
                     image_url=p.get("thumbnail"),
                     category=data.get("name"),
+                    section=classify([padre, data.get("name"), seccion.get("name")], p.get("display_name")),
                     url=p.get("share_url"),
                 )
             )
