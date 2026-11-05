@@ -81,12 +81,26 @@ class ScrapeRoutesTestCase(unittest.TestCase):
 
         start_job.assert_not_called()
 
-    def test_lidl_is_disabled_by_default(self) -> None:
+    @patch("app.api.routes.scrape.scrape_service.start_job")
+    def test_lidl_is_enabled_by_default(self, start_job) -> None:
+        start_job.return_value = ScrapeJob(supermarket="lidl", status="running")
         with patch.object(
             scrape_routes.settings, "scrape_token", SecretStr("test-scrape-token")
         ):
             response = self.client.post(
                 "/scrape/lidl",
+                headers={"X-Scrape-Token": "test-scrape-token"},
+            )
+
+        self.assertEqual(response.status_code, 202)
+        start_job.assert_called_once_with("lidl", None)
+
+    def test_unknown_supermarket_is_not_found(self) -> None:
+        with patch.object(
+            scrape_routes.settings, "scrape_token", SecretStr("test-scrape-token")
+        ):
+            response = self.client.post(
+                "/scrape/carrefour",
                 headers={"X-Scrape-Token": "test-scrape-token"},
             )
 
