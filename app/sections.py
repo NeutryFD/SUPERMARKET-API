@@ -7,7 +7,8 @@ de la ruta de su categoría en la tienda y, si no basta, de su nombre.
 """
 
 import re
-import unicodedata
+
+from app.core.text import normalize
 
 # (slug, nombre) en el orden en que se muestran
 SECTIONS: list[tuple[str, str]] = [
@@ -65,13 +66,6 @@ _RULES: list[tuple[str, str]] = [
     ("despensa", r"despensa|aceite|vinagre|\bsal\b|especia|arroz|pasta|fideo|legumbre|lenteja|garbanzo|alubia|conserva|salsa|mayonesa|ketchup|mostaza|tomate frito|caldo|sopa|crema|pure|harina|levadura|aceitunas|encurtido|aperitivo|snack|patatas fritas|frutos secos|cocina internacional|alimentacion|condimento|gazpacho"),
 ]
 _COMPILED = [(slug, re.compile(pattern)) for slug, pattern in _RULES]
-
-
-def normalize(text: str) -> str:
-    """Minúsculas y sin tildes, para comparar con las reglas"""
-    return "".join(
-        c for c in unicodedata.normalize("NFKD", text.casefold()) if not unicodedata.combining(c)
-    )
 
 
 def classify(path: list[str | None], name: str | None = None) -> str:

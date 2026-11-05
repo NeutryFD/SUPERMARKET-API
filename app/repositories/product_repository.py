@@ -4,10 +4,10 @@ Capa de repositorio
 
 from datetime import datetime, timezone
 import re
-import unicodedata
-from sqlalchemy import and_, case, delete, func, or_, select
+from sqlalchemy import and_, case, delete, func, select
 from app.core.database import SessionLocal
-from app.models.product import ProductRow
+from app.core.text import normalize
+from app.models.product import ProductRow, fill_search_columns
 from app.repositories import backup_repository
 from app.schemas.product import Product
 from app.sections import classify
@@ -15,29 +15,7 @@ from app.sections import classify
 
 def _search_terms(query: str) -> list[str]:
     """Normaliza la consulta y separa sus palabras significativas."""
-    normalized = "".join(
-        character
-        for character in unicodedata.normalize("NFKD", query.casefold())
-        if not unicodedata.combining(character)
-    )
-    return re.findall(r"[a-z0-9]+", normalized)
-
-
-def _normalized_column(column):
-    """Expresión SQL sin mayúsculas ni tildes, compatible con SQLite y MySQL."""
-    expression = func.lower(func.coalesce(column, ""))
-    for source, replacement in (
-        ("áàäâÁÀÄÂ", "a"),
-        ("éèëêÉÈËÊ", "e"),
-        ("íìïîÍÌÏÎ", "i"),
-        ("óòöôÓÒÖÔ", "o"),
-        ("úùüûÚÙÜÛ", "u"),
-        ("ñÑ", "n"),
-        ("çÇ", "c"),
-    ):
-        for character in source:
-            expression = func.replace(expression, character, replacement)
-    return expression
+    return re.findall(r"[a-z0-9]+", normalize(query))
 
 
 # Metodo de conveniencia para guardar el catálogo completo de un supermercado
@@ -116,7 +94,7 @@ def _orden(sort: str, q: str | None) -> list:
         ]
     terms = _search_terms(q) if q else []
     if sort == "relevance" and terms:
-        nombre = _normalized_column(ProductRow.name)
+        nombre = ProductRow.name_search
         frase = " ".join(terms)
         # Primero el nombre que empieza por la frase buscada, luego el que la
         # contiene como palabra, luego el que la contiene en cualquier sitio
@@ -160,19 +138,10 @@ def _filtros(
         # Lista vacía = ningún supermercado (el frontend los ha desactivado todos)
         filtros.append(ProductRow.supermarket.in_(supermarkets))
     if q:
-        columns = (
-            ProductRow.name,
-            ProductRow.description,
-            ProductRow.brand,
-            ProductRow.category,
-            ProductRow.ean,
-        )
-        normalized_columns = tuple(_normalized_column(column) for column in columns)
         for term in _search_terms(q):
-            # Cada palabra puede estar en un campo distinto y en cualquier orden.
-            filtros.append(
-                or_(*(column.like(f"%{term}%") for column in normalized_columns))
-            )
+            # Cada palabra puede estar en un campo distinto y en cualquier orden:
+            # search_text ya junta los campos normalizados
+            filtros.append(ProductRow.search_text.like(f"%{term}%"))
     if category:
         filtros.append(ProductRow.category.ilike(f"%{category}%"))
     if promotion:
@@ -256,4 +225,14 @@ def backfill_sections() -> int:
         rows = session.scalars(select(ProductRow).where(ProductRow.section.is_(None))).all()
         for row in rows:
             row.section = classify([row.category], row.name)
+    return len(rows)
+
+
+# Calcular las columnas de búsqueda de los productos que no las tienen
+def backfill_search_columns() -> int:
+    """Rellena search_text y name_search de las filas de versiones anteriores. Devuelve cuántas."""
+    with SessionLocal() as session, session.begin():
+        rows = session.scalars(select(ProductRow).where(ProductRow.search_text.is_(None))).all()
+        for row in rows:
+            fill_search_columns(row)
     return len(rows)
