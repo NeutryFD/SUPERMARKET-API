@@ -7,6 +7,7 @@ import logging
 import re
 import httpx
 from app.schemas.product import Product
+from app.sections import classify
 from app.scrapers.http import post_form_json
 
 logger = logging.getLogger(__name__) # logger
@@ -28,25 +29,25 @@ async def scrape(client: httpx.AsyncClient) -> list[Product]:
     logger.info("bonÀrea: %d categorías a descargar", len(hojas))
 
     productos: dict[str, Product] = {}
-    fallidas: list[tuple[str, str]] = []
+    fallidas: list[tuple[str, str, list[str]]] = []
     limite = asyncio.Semaphore(3)  # máximo 3 peticiones a la vez
 
-    async def bajar_categoria(identificador: str, nombre: str) -> None:
+    async def bajar_categoria(identificador: str, nombre: str, ruta: list[str]) -> None:
         async with limite:
             try:
                 data = await post_form_json(
                     client, f"{API}/ShoppingBody", reference=identificador.replace("*", "_")
                 )
             except httpx.HTTPError:
-                fallidas.append((identificador, nombre))
+                fallidas.append((identificador, nombre, ruta))
                 return
-        for producto in _parsear_articulos(data.get("articles", []), nombre):
+        for producto in _parsear_articulos(data.get("articles", []), nombre, ruta):
             productos.setdefault(producto.id, producto)
 
-    await asyncio.gather(*(bajar_categoria(i, n) for i, n in hojas))
+    await asyncio.gather(*(bajar_categoria(i, n, r) for i, n, r in hojas))
 
     # Las categorías que fallaron se reintentan al final, de una en una y con pausa
-    for identificador, nombre in fallidas:
+    for identificador, nombre, ruta in fallidas:
         await asyncio.sleep(5)
         try:
             data = await post_form_json(
@@ -55,30 +56,31 @@ async def scrape(client: httpx.AsyncClient) -> list[Product]:
         except httpx.HTTPError as error:
             logger.error("Categoría %s perdida: %s", identificador, error)
             continue
-        for producto in _parsear_articulos(data.get("articles", []), nombre):
+        for producto in _parsear_articulos(data.get("articles", []), nombre, ruta):
             productos.setdefault(producto.id, producto)
 
     return list(productos.values())
 
-# _categorias_hoja recorre el árbol de categorías y devuelve (identificador, nombre)
+# _categorias_hoja recorre el árbol de categorías y devuelve (identificador, nombre, ruta)
 # de las categorías finales de las secciones que interesan
-def _categorias_hoja(nivells: list[dict]) -> list[tuple[str, str]]:
+def _categorias_hoja(nivells: list[dict]) -> list[tuple[str, str, list[str]]]:
     hojas = []
 
-    def recorrer(nodo: dict) -> None:
+    def recorrer(nodo: dict, ruta: list[str]) -> None:
+        nombre = nodo.get("descripcio") or nodo.get("description")
         hijos = nodo.get("children") or []
         if hijos:
             for hijo in hijos:
-                recorrer(hijo)
+                recorrer(hijo, [*ruta, nombre])
         elif nodo.get("identifier"):
-            hojas.append((nodo["identifier"], nodo.get("descripcio") or nodo.get("description")))
+            hojas.append((nodo["identifier"], nombre, [*ruta, nombre]))
 
     for seccion in nivells:
         for nodo in seccion.get("children") or []:
-            recorrer(nodo)
+            recorrer(nodo, [seccion.get("descripcio")])
 
     # El identificador es "13*300*010*...": la segunda parte es la sección
-    return [(i, n) for i, n in hojas if i.split("*")[1] in SECTIONS]
+    return [h for h in hojas if h[0].split("*")[1] in SECTIONS]
 
 # Distintivos de promoción de bonÀrea (en "caracteristiques"), por orden de prioridad
 PROMOTIONS = {
@@ -96,7 +98,9 @@ def _promocion(articulo: dict) -> str | None:
     return next((etiqueta for codigo, etiqueta in PROMOTIONS.items() if codigo in distintivos), None)
 
 # _parsear_articulos normaliza los artículos de una categoría de bonÀrea a nuestro esquema Product
-def _parsear_articulos(articulos: list[dict], categoria: str | None) -> list[Product]:
+def _parsear_articulos(
+    articulos: list[dict], categoria: str | None, ruta: list[str] | None = None
+) -> list[Product]:
     resultado = []
     for a in articulos:
         if not a.get("isValid", True) or not a.get("identifier") or not a.get("description"):
@@ -115,6 +119,7 @@ def _parsear_articulos(articulos: list[dict], categoria: str | None) -> list[Pro
                 promotion=_promocion(a),
                 image_url=f"{IMAGES}/{imagenes[0]}?width=400&height=400" if imagenes else None,
                 category=categoria,
+                section=classify(ruta or [categoria], a["description"]),
                 url=a.get("urlFriendly"),
             )
         )
