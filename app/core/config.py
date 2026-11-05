@@ -36,10 +36,9 @@ class Settings(BaseSettings):
     # cuando el scraping se lanza sin ?postcode=
     postcode: str = "08001"
 
-    # Supermercados que se scrapean. Lidl queda fuera por defecto: su
-    # robots.txt bloquea las URLs de búsqueda que usa su scraper.
+    # Supermercados que se scrapean.
     # Formato JSON en el .env: SUPERMARKET_API_ENABLED_SUPERMARKETS=["mercadona","consum"]
-    enabled_supermarkets: list[str] = ["mercadona", "bonarea", "aldi", "consum", "masymas"]
+    enabled_supermarkets: list[str] = ["mercadona", "bonarea", "aldi", "consum", "masymas", "lidl"]
 
     # Configuración de la clase interna Config para pydantic-settings
     class Config:
