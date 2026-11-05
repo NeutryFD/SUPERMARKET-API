@@ -151,10 +151,14 @@ def _filtros(
     promotion: bool = False,
     section: str | None = None,
     subcategory: str | None = None,
+    supermarkets: list[str] | None = None,
 ) -> list:
     filtros = []
     if supermarket:
         filtros.append(ProductRow.supermarket == supermarket)
+    if supermarkets is not None:
+        # Lista vacía = ningún supermercado (el frontend los ha desactivado todos)
+        filtros.append(ProductRow.supermarket.in_(supermarkets))
     if q:
         columns = (
             ProductRow.name,
@@ -191,11 +195,12 @@ def search_products(
     promotion: bool = False,
     section: str | None = None,
     subcategory: str | None = None,
+    supermarkets: list[str] | None = None,
 ) -> tuple[int, list[Product]]:
     """Devuelve (total de resultados, productos de la página pedida)
     Los filtros se aplican en SQL, que con los índices de la tabla es
     mucho más rápido que traer todo y filtrar en Python"""
-    filtros = _filtros(supermarket, q, category, promotion, section, subcategory)
+    filtros = _filtros(supermarket, q, category, promotion, section, subcategory, supermarkets)
 
     with SessionLocal() as session:
         total = (
@@ -218,10 +223,11 @@ def count_sections(
     q: str | None,
     promotion: bool = False,
     section: str | None = None,
+    supermarkets: list[str] | None = None,
 ) -> tuple[dict[str, int], dict[str, int]]:
     """Devuelve ({sección: productos}, {categoría de tienda: productos}).
     Las categorías solo se cuentan para la sección pedida."""
-    filtros = _filtros(supermarket, q, None, promotion)
+    filtros = _filtros(supermarket, q, None, promotion, supermarkets=supermarkets)
     with SessionLocal() as session:
         por_seccion = dict(
             session.execute(
