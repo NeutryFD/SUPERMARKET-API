@@ -47,7 +47,7 @@ class ProductRoutesTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["items"][0]["name"], "Aceite de oliva")
         get_products.assert_called_once_with(
-            "mercadona", "aceite", "Aceites", 2, 25, "relevance", False
+            "mercadona", "aceite", "Aceites", 2, 25, "relevance", False, None, None
         )
 
     @patch("app.api.routes.products.catalog_service.get_products")
