@@ -77,6 +77,12 @@ class ProductRow(Base):
         String(255),
     )
 
+    # Sección común a todos los supermercados; con índice ya que el panel de categorías filtra por ella
+    section: Mapped[str | None] = mapped_column(
+        String(32),
+        index=True,
+    )
+
     # Con índice ya que permite cruzar el mismo producto entre supermercados
     ean: Mapped[str | None] = mapped_column(
         String(32),
@@ -107,6 +113,7 @@ class ProductRow(Base):
             promotion=self.promotion,
             image_url=self.image_url,
             category=self.category,
+            section=self.section,
             ean=self.ean,
             url=self.url,
         )
