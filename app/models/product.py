@@ -3,9 +3,10 @@ Capa de modelos (ORM)
 """
 
 from datetime import datetime
-from sqlalchemy import DateTime, Float, String, Text
+from sqlalchemy import DateTime, Float, String, Text, event
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
+from app.core.text import normalize, search_text
 from app.schemas.product import Product
 
 class ProductRow(Base):
@@ -93,6 +94,17 @@ class ProductRow(Base):
         Text,
     )
 
+    # Texto normalizado (minúsculas, sin tildes) de nombre, descripción, marca, categoría y EAN.
+    # Se calcula al guardar para no normalizar miles de filas en cada búsqueda.
+    search_text: Mapped[str | None] = mapped_column(
+        Text,
+    )
+
+    # Nombre normalizado, para ordenar por relevancia
+    name_search: Mapped[str | None] = mapped_column(
+        String(512),
+    )
+
     # Cuándo se scrapeó esta fila
     scraped_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -117,3 +129,15 @@ class ProductRow(Base):
             ean=self.ean,
             url=self.url,
         )
+
+
+def fill_search_columns(row: ProductRow) -> None:
+    """Calcula las columnas de búsqueda a partir de los campos del producto"""
+    row.search_text = search_text(row.name, row.description, row.brand, row.category, row.ean)
+    row.name_search = normalize(row.name or "")
+
+
+@event.listens_for(ProductRow, "before_insert")
+@event.listens_for(ProductRow, "before_update")
+def _fill_search_columns(_mapper, _connection, row: ProductRow) -> None:
+    fill_search_columns(row)
