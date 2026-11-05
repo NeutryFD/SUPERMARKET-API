@@ -40,10 +40,11 @@ def get_products(
     promotion: bool = False,
     section: str | None = None,
     subcategory: str | None = None,
+    supermarkets: list[str] | None = None,
 ) -> ProductPage:
     """Búsqueda paginada de productos"""
     total, items = product_repository.search_products(
-        supermarket, q, category, page, page_size, sort, promotion, section, subcategory
+        supermarket, q, category, page, page_size, sort, promotion, section, subcategory, supermarkets
     )
     return ProductPage(
         total=total,
@@ -59,10 +60,13 @@ def get_sections(
     q: str | None,
     promotion: bool = False,
     section: str | None = None,
+    supermarkets: list[str] | None = None,
 ) -> list[SectionInfo]:
     """Todas las secciones comunes, en su orden, con sus productos para los filtros dados.
     La sección pedida incluye sus categorías de tienda, de más a menos productos"""
-    por_seccion, por_categoria = product_repository.count_sections(supermarket, q, promotion, section)
+    por_seccion, por_categoria = product_repository.count_sections(
+        supermarket, q, promotion, section, supermarkets
+    )
     categorias = [
         SectionCategory(name=nombre, count=total)
         for nombre, total in sorted(por_categoria.items(), key=lambda c: (-c[1], c[0]))
