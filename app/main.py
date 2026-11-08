@@ -36,7 +36,7 @@ app = FastAPI(
     version="1.1.0",
     description=(
         "Complete product catalog (name, description, current estimated "
-        "price and photo) from Mercadona, Consum, Masymas and Lidl."
+        "price and photo) from Mercadona, Consum, Masymas, Lidl and Ametller Origen."
     ),
     lifespan=lifespan,
 )
