@@ -4,10 +4,10 @@ Capa de scrapers
 
 from app.core.config import settings
 from app.schemas.product import Product
-from app.scrapers import aktios, aldi, bonarea, lidl, mercadona
+from app.scrapers import aktios, aldi, ametller, bonarea, lidl, mercadona
 from app.scrapers.http import new_client
 
-ALL_SUPERMARKETS = ["mercadona", "bonarea", "aldi", "consum", "masymas", "lidl"]
+ALL_SUPERMARKETS = ["mercadona", "bonarea", "aldi", "consum", "masymas", "lidl", "ametller"]
 
 # Solo los supermercados activados en la configuración se pueden scrapear
 SUPERMARKETS = [s for s in ALL_SUPERMARKETS if s in settings.enabled_supermarkets]
@@ -27,4 +27,6 @@ async def scrape(supermarket: str, postcode: str) -> list[Product]:
             return await aktios.scrape(client, "masymas", "https://tienda.masymas.com")
         if supermarket == "lidl":
             return await lidl.scrape(client)
+        if supermarket == "ametller":
+            return await ametller.scrape(client)
         raise ValueError(f"Supermarket not found: {supermarket}")
