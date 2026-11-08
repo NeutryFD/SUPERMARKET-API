@@ -43,6 +43,7 @@ IMAGE_HOSTS = frozenset(
         "images.bonarea.com",
         "prod-mercadona.imgix.net",
         "s7g10.scene7.com",
+        "www.ametllerorigen.com",
         "www.lidl.es",
     }
 )
@@ -111,7 +112,7 @@ def categories(
 @router.get("/products", response_model=ProductPage)
 def products(
     supermarket: str | None = Query(
-        None, description="mercadona, consum, masymas or lidl"
+        None, description="mercadona, bonarea, aldi, consum, masymas, lidl or ametller"
     ),
     q: str | None = Query(
         None,
