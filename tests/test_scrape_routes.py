@@ -95,6 +95,20 @@ class ScrapeRoutesTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 202)
         start_job.assert_called_once_with("lidl", None)
 
+    @patch("app.api.routes.scrape.scrape_service.start_job")
+    def test_ametller_is_enabled_by_default(self, start_job) -> None:
+        start_job.return_value = ScrapeJob(supermarket="ametller", status="running")
+        with patch.object(
+            scrape_routes.settings, "scrape_token", SecretStr("test-scrape-token")
+        ):
+            response = self.client.post(
+                "/scrape/ametller",
+                headers={"X-Scrape-Token": "test-scrape-token"},
+            )
+
+        self.assertEqual(response.status_code, 202)
+        start_job.assert_called_once_with("ametller", None)
+
     def test_unknown_supermarket_is_not_found(self) -> None:
         with patch.object(
             scrape_routes.settings, "scrape_token", SecretStr("test-scrape-token")
