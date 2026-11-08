@@ -24,7 +24,7 @@ Supermarket API es una API REST autoalojada que extrae el **catálogo completo**
 
 ## ✨ Qué puedes hacer
 
-- 🛒 Descargar el catálogo **completo** de Mercadona, bonÀrea, Aldi, Consum, Masymas y Lidl (~31.000 productos) con una sola petición.
+- 🛒 Descargar el catálogo **completo** de Mercadona, bonÀrea, Aldi, Consum, Masymas, Lidl y Ametller Origen (~34.000 productos) con una sola petición.
 - 🏷️ Ver las ofertas y bajadas de precio de cada cadena, con el precio anterior cuando la tienda lo muestra, ordenadas por descuento.
 - 📍 Obtener los precios de Mercadona del almacén que sirve a un código postal.
 - 🔍 Buscar productos por nombre, descripción o marca, ordenados por relevancia, precio, precio por unidad, nombre o descuento, con filtros por supermercado, categoría y ofertas, paginados.
@@ -81,6 +81,7 @@ flowchart LR
         K["🔷 aldi.py"]
         E["🟠 aktios.py<br/>Consum + Masymas"]
         L["🔵 lidl.py"]
+        O["🟩 ametller.py"]
     end
 
     subgraph S3["🏪 Tiendas online"]
@@ -91,11 +92,13 @@ flowchart LR
         G["tienda.consum.es"]
         H["tienda.masymas.com"]
         I["www.lidl.es"]
+        P["www.ametllerorigen.com"]
     end
 
     B --> D
     B --> E
     B --> L
+    B --> O
     B --> J
     B --> K
     D -- "httpx async" --> F
@@ -104,6 +107,7 @@ flowchart LR
     L -- "httpx async" --> I
     J -- "httpx async" --> M
     K -- "httpx async" --> N
+    O -- "httpx async" --> P
     C --> DB[("💽 MySQL / SQLite<br/>products<br/>product_backups")]
 
     classDef api fill:#0f172a,stroke:#38bdf8,color:#f8fafc,stroke-width:2px;
@@ -112,8 +116,8 @@ flowchart LR
     classDef user fill:#1f2937,stroke:#f59e0b,color:#fff7ed,stroke-width:2px,stroke-dasharray: 5 3;
 
     class A,B,C api;
-    class D,E,J,K,L scraper;
-    class F,G,H,I,M,N tienda;
+    class D,E,J,K,L,O scraper;
+    class F,G,H,I,M,N,P tienda;
     class U user;
 
     style S1 fill:#08111f,stroke:#38bdf8,stroke-width:1.5px,stroke-dasharray: 4 4,color:#e2e8f0
@@ -124,7 +128,7 @@ flowchart LR
 | Componente | Tecnología | Detalle |
 | ---------- | ---------- | ------- |
 | API | FastAPI + Uvicorn | Capa HTTP con GET, POST y **QUERY (RFC 10008)**. Swagger en `/docs`. Puerto **8000**. |
-| Scrapers | httpx asíncrono | Mercadona (API de categorías), bonÀrea (JSON de su tienda online), Aldi (datos de Next.js de sus páginas de categoría), Aktios (API compartida por Consum y Masymas) y Lidl (ofertas en tienda de su web). |
+| Scrapers | httpx asíncrono | Mercadona (API de categorías), bonÀrea (JSON de su tienda online), Aldi (datos de Next.js de sus páginas de categoría), Aktios (API compartida por Consum y Masymas) Lidl (ofertas en tienda de su web) y Ametller Origen (API de Salesforce Commerce Cloud de su tienda online). |
 | BBDD | MySQL / SQLite vía SQLAlchemy | `products` (catálogo) y `product_backups` (scripts .sql de respaldo). |
 
 ### 🏪 Fuentes de datos
@@ -137,6 +141,7 @@ flowchart LR
 | Consum | API REST Aktios `tienda.consum.es/api/rest/V1.0` (paginada por offset) | ~9.300 |
 | Masymas | API REST Aktios `tienda.masymas.com/api/rest/V1.0` (misma plataforma) | ~7.800 |
 | Lidl | Páginas de ofertas en tienda de esta semana de `www.lidl.es/c/store/...` (datos de cada producto en el HTML; precios de península). Lidl no vende alimentación online en España: solo están sus ofertas de la semana, no el catálogo completo | ~100 |
+| Ametller Origen | API de Salesforce Commerce Cloud de `www.ametllerorigen.com` (sesión de invitado, búsqueda paginada de todo el catálogo). Los precios club y las rebajas de lotes se aplican al precio; las promociones de varias unidades (2x3€...) solo se indican | ~3.300 |
 
 ---
 
@@ -149,7 +154,7 @@ flowchart LR
 | `GET` | `/sections` | Secciones comunes a todos los supermercados con su nº de productos para los filtros dados; con `section`, también las categorías de tienda de esa sección |
 | `GET` / `QUERY` | `/supermarkets` | Supermercados con nº de productos y fecha del último scraping |
 | `POST` | `/scrape` | Lanza el scraping de todos los supermercados activos en segundo plano (`postcode` opcional) |
-| `POST` | `/scrape/{supermarket}` | Lanza el scraping de uno: `mercadona`, `bonarea`, `aldi`, `consum`, `masymas` o `lidl` (`postcode` opcional) |
+| `POST` | `/scrape/{supermarket}` | Lanza el scraping de uno: `mercadona`, `bonarea`, `aldi`, `consum`, `masymas`, `lidl` o `ametller` (`postcode` opcional) |
 | `GET` / `QUERY` | `/scrape/status` | Estado de los trabajos de scraping |
 | `GET` | `/backups` | Lista los backups automáticos del catálogo |
 | `GET` | `/backups/{id}/download` | Descarga el backup como fichero `.sql` restaurable |
@@ -200,7 +205,7 @@ La base de datos debe existir (`CREATE DATABASE supermarket_api CHARACTER SET ut
 
 Los precios de Mercadona dependen del almacén que sirve cada código postal. El scraper traduce el código postal a su almacén (cabecera `x-customer-wh` de la API de Mercadona) y descarga el catálogo de ese almacén. Se indica con `POST /scrape?postcode=08001`; sin él se usa `SUPERMARKET_API_POSTCODE` (por defecto `08001`).
 
-Solo se scrapean los supermercados de `SUPERMARKET_API_ENABLED_SUPERMARKETS` (por defecto `["mercadona","bonarea","aldi","consum","masymas","lidl"]`). Los precios de bonÀrea, Aldi, Consum, Masymas y Lidl no dependen del código postal. Las ofertas de Lidl llevan en `promotion` hasta cuándo valen y si el precio es solo con Lidl Plus (por ejemplo `Con Lidl Plus -27% · hasta el 8/11`).
+Solo se scrapean los supermercados de `SUPERMARKET_API_ENABLED_SUPERMARKETS` (por defecto `["mercadona","bonarea","aldi","consum","masymas","lidl","ametller"]`). Los precios de bonÀrea, Aldi, Consum, Masymas, Lidl y Ametller Origen no dependen del código postal. Las ofertas de Lidl llevan en `promotion` hasta cuándo valen y si el precio es solo con Lidl Plus (por ejemplo `Con Lidl Plus -27% · hasta el 8/11`).
 
 ### 🗂️ Secciones comunes
 
@@ -281,7 +286,8 @@ SUPERMARKET-API/
     │   ├── bonarea.py       # JSON de la tienda online de bonÀrea
     │   ├── aldi.py          # Páginas de categoría de www.aldi.es
     │   ├── aktios.py        # API compartida por Consum y Masymas
-    │   └── lidl.py          # Ofertas en tienda de www.lidl.es
+    │   ├── lidl.py          # Ofertas en tienda de www.lidl.es
+    │   └── ametller.py      # API de la tienda de Ametller Origen
     │
     ├── models/              # Tablas de la base de datos (SQLAlchemy ORM)
     │   ├── product.py       # Tabla products
@@ -316,4 +322,4 @@ Este proyecto está bajo licencia **Apache 2.0** — puedes usarlo, modificarlo 
 
 Copyright (c) 2026 David Torro. Ver el archivo [LICENSE](LICENSE) para más detalles.
 
-> ⚠️ Los datos de productos pertenecen a sus respectivos supermercados (Mercadona, Consum, Masymas y Lidl) y se extraen de sus tiendas online públicas. Este proyecto es educativo: úsalo de forma responsable y respeta los términos de uso de cada web.
+> ⚠️ Los datos de productos pertenecen a sus respectivos supermercados (Mercadona, Consum, Masymas, Lidl y Ametller Origen) y se extraen de sus tiendas online públicas. Este proyecto es educativo: úsalo de forma responsable y respeta los términos de uso de cada web.

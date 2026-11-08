@@ -15,7 +15,7 @@ class Product(BaseModel):
         description="Product ID (unique within a supermarket)",
     )
     supermarket: str = Field(
-        description="Supermarket of origin: mercadona, bonarea, aldi, consum, masymas or lidl",
+        description="Supermarket of origin: mercadona, bonarea, aldi, consum, masymas, lidl or ametller",
     )
     name: str = Field(
         description="Product name",

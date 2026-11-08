@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     # Supermercados que se scrapean.
     # Formato JSON en el .env: SUPERMARKET_API_ENABLED_SUPERMARKETS=["mercadona","consum"]
-    enabled_supermarkets: list[str] = ["mercadona", "bonarea", "aldi", "consum", "masymas", "lidl"]
+    enabled_supermarkets: list[str] = ["mercadona", "bonarea", "aldi", "consum", "masymas", "lidl", "ametller"]
 
     # Configuración de la clase interna Config para pydantic-settings
     class Config:
